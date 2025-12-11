@@ -35,16 +35,24 @@ const Index = () => {
   const handleBackToPlans = () => {
     setCurrentStep(1);
   };
-  const handleCheckout = (formData: any) => {
-    console.log('Checkout data:', {
-      plan: selectedPlan,
-      formData
-    });
+  const handleCheckout = (result: { success: boolean; orderId?: string; customerId?: string; error?: string; isSimulated?: boolean }) => {
+    console.log('Checkout result:', result);
     
-    // Redirect to add-ons after a short delay
-    setTimeout(() => {
-      navigate("/add-ons");
-    }, 1500);
+    if (result.success) {
+      // Show success message
+      toast({
+        title: "Payment Successful!",
+        description: result.isSimulated ? "Test mode: Order created successfully" : "Your subscription is now active",
+      });
+      
+      // Redirect to add-ons after a short delay
+      setTimeout(() => {
+        navigate("/add-ons");
+      }, 1500);
+    } else {
+      // Error is already shown by checkout form
+      console.error('Checkout failed:', result.error);
+    }
   };
 
   // Step 2: Checkout Form

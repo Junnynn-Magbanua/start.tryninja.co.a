@@ -1,13 +1,16 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { NinjaLogo } from "@/components/ui/ninja-logo";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { CheckIcon, ZapIcon, TrendingUpIcon, StarIcon, MessageSquareIcon, BrainIcon, SparklesIcon, ShieldCheckIcon } from "lucide-react";
+import { CheckIcon, ZapIcon, TrendingUpIcon, StarIcon, MessageSquareIcon, BrainIcon, SparklesIcon, ShieldCheckIcon, Loader2 } from "lucide-react";
+import { createStickyOrder, type StickyOrderData } from "@/lib/sticky";
+import { toast } from "@/hooks/use-toast";
 
 interface AddOn {
   id: string;
+  productId: string;
   name: string;
   price: number;
   isMonthly: boolean;
@@ -23,6 +26,7 @@ interface AddOn {
 }
 
 interface SetupTier {
+  productId: string;
   name: string;
   price: number;
   recommended?: boolean;
@@ -31,6 +35,7 @@ interface SetupTier {
 
 const SETUP_TIERS: SetupTier[] = [
   {
+    productId: "14",
     name: "Essential Setup",
     price: 99,
     features: [
@@ -42,6 +47,7 @@ const SETUP_TIERS: SetupTier[] = [
     ]
   },
   {
+    productId: "15",
     name: "Pro Setup",
     price: 149,
     recommended: true,
@@ -55,6 +61,7 @@ const SETUP_TIERS: SetupTier[] = [
     ]
   },
   {
+    productId: "16",
     name: "Elite Setup",
     price: 299,
     features: [
@@ -72,6 +79,7 @@ const SETUP_TIERS: SetupTier[] = [
 const ADD_ONS: AddOn[] = [
   {
     id: "advanced-presence",
+    productId: "11",
     name: "Advanced Presence",
     price: 39,
     isMonthly: true,
@@ -91,6 +99,7 @@ const ADD_ONS: AddOn[] = [
   },
   {
     id: "google-posting",
+    productId: "12",
     name: "Google AI-Posting Pro",
     price: 79,
     isMonthly: true,
@@ -111,6 +120,7 @@ const ADD_ONS: AddOn[] = [
   },
   {
     id: "power-reviews",
+    productId: "10",
     name: "Power Reviews",
     price: 29,
     isMonthly: true,
@@ -129,6 +139,7 @@ const ADD_ONS: AddOn[] = [
   },
   {
     id: "ai-presence",
+    productId: "13",
     name: "ChatGPT AI Booster",
     price: 49,
     isMonthly: true,
@@ -155,19 +166,61 @@ const AddOns = () => {
   const [currentStep, setCurrentStep] = useState(0);
   const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
   const [selectedSetupTier, setSelectedSetupTier] = useState<number | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [customerInfo, setCustomerInfo] = useState<{
+    customerId?: string;
+    orderId?: string;
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+  }>({});
   const totalSteps = 5;
+
+  useEffect(() => {
+    const customerId = sessionStorage.getItem('ninja_customer_id');
+    const orderId = sessionStorage.getItem('ninja_order_id');
+    const email = sessionStorage.getItem('ninja_customer_email');
+    const firstName = sessionStorage.getItem('ninja_customer_firstName');
+    const lastName = sessionStorage.getItem('ninja_customer_lastName');
+
+    if (customerId && orderId) {
+      setCustomerInfo({
+        customerId,
+        orderId,
+        email: email || '',
+        firstName: firstName || '',
+        lastName: lastName || ''
+      });
+    }
+  }, []);
 
   const handleSetupSelect = (tierIndex: number) => {
     setSelectedSetupTier(tierIndex);
+    const tier = SETUP_TIERS[tierIndex];
+    toast({
+      title: "Setup Selected!",
+      description: `${tier.name} has been added to your selection.`
+    });
     setCurrentStep(1);
   };
 
   const handleAddOnSelect = (addOnId: string) => {
-    setSelectedAddOns(prev => [...prev, addOnId]);
+    const addOn = ADD_ONS.find(a => a.id === addOnId);
+
+    if (addOn) {
+      toast({
+        title: "Add-on Selected!",
+        description: `${addOn.name} has been added to your selection.`
+      });
+    }
+
     if (currentStep < totalSteps - 1) {
+      setSelectedAddOns(prev => [...prev, addOnId]);
       setCurrentStep(currentStep + 1);
     } else {
-      handleComplete();
+      // Last add-on - pass it directly to handleComplete
+      const finalSelections = [...selectedAddOns, addOnId];
+      handleComplete(finalSelections);
     }
   };
 
@@ -175,21 +228,130 @@ const AddOns = () => {
     if (currentStep < totalSteps - 1) {
       setCurrentStep(currentStep + 1);
     } else {
-      handleComplete();
+      handleComplete(selectedAddOns);
     }
   };
 
-  const handleComplete = () => {
-    const setupTier = selectedSetupTier !== null ? SETUP_TIERS[selectedSetupTier] : null;
-    
-    // Navigate to Super Boost page with user selections
-    navigate("/super-boost", {
-      state: {
-        selectedPlan: { name: "Professional Plan", price: 99 },
-        selectedSetupTier: setupTier ? { name: setupTier.name, price: setupTier.price } : null,
-        selectedAddOns: selectedAddOns
+  const handleComplete = async (finalAddOnSelections?: string[]) => {
+    setIsProcessing(true);
+
+    try {
+      // Use the passed selections or current state
+      const addOnsToProcess = finalAddOnSelections || selectedAddOns;
+
+      // Build products array with all selected items
+      const products: Array<{ id: string; price: number; name: string }> = [];
+
+      // Add setup fee if selected
+      if (selectedSetupTier !== null) {
+        const tier = SETUP_TIERS[selectedSetupTier];
+        products.push({
+          id: tier.productId,
+          price: tier.price,
+          name: tier.name
+        });
       }
-    });
+
+      // Add all selected add-ons
+      addOnsToProcess.forEach(addOnId => {
+        const addOn = ADD_ONS.find(a => a.id === addOnId);
+        if (addOn) {
+          products.push({
+            id: addOn.productId,
+            price: addOn.price,
+            name: addOn.name
+          });
+        }
+      });
+
+      // If any items selected, process the order
+      if (products.length > 0 && customerInfo.customerId && customerInfo.orderId) {
+        const totalAmount = products.reduce((sum, p) => sum + p.price, 0);
+
+        const orderData: StickyOrderData = {
+          products: products,
+          email: customerInfo.email || '',
+          firstName: customerInfo.firstName || '',
+          lastName: customerInfo.lastName || '',
+          phone: '',
+          billingAddress: '',
+          billingCity: '',
+          billingState: '',
+          billingZip: '',
+          billingCountry: 'US',
+          cardNumber: '',
+          cardExpMonth: '',
+          cardExpYear: '',
+          cardCvv: '',
+          totalAmount: totalAmount,
+          customerId: customerInfo.customerId,
+          parentOrderId: customerInfo.orderId,
+          stepNumber: 2 // All upsells start from step 2
+        };
+
+        const result = await createStickyOrder(orderData);
+
+        if (result.success) {
+          const setupValue = selectedSetupTier !== null ? SETUP_TIERS[selectedSetupTier].price : 0;
+          const monthlyValue = addOnsToProcess.reduce((sum, id) => {
+            const addOn = ADD_ONS.find(a => a.id === id);
+            return sum + (addOn?.price || 0);
+          }, 0);
+
+          toast({
+            title: "🎉 Add-Ons Secured!",
+            description: `Your growth engine is ready. Setup: $${setupValue} + $${monthlyValue}/mo recurring`
+          });
+
+          // Navigate to Super Boost page
+          const setupTier = selectedSetupTier !== null ? SETUP_TIERS[selectedSetupTier] : null;
+          
+          setTimeout(() => {
+            navigate("/super-boost", {
+              state: {
+                selectedPlan: { 
+                  name: sessionStorage.getItem('ninja_selected_plan') || "Professional Plan", 
+                  price: parseInt(sessionStorage.getItem('ninja_plan_price') || '99')
+                },
+                selectedSetupTier: setupTier ? { name: setupTier.name, price: setupTier.price } : null,
+                selectedAddOns: addOnsToProcess
+              }
+            });
+            setIsProcessing(false);
+          }, 1500);
+        } else {
+          toast({
+            title: "Order Failed",
+            description: result.error || "There was an error processing your order.",
+            variant: "destructive"
+          });
+          setIsProcessing(false);
+        }
+      } else {
+        // No items selected, navigate to Super Boost directly
+        const setupTier = selectedSetupTier !== null ? SETUP_TIERS[selectedSetupTier] : null;
+        
+        navigate("/super-boost", {
+          state: {
+            selectedPlan: { 
+              name: sessionStorage.getItem('ninja_selected_plan') || "Professional Plan", 
+              price: parseInt(sessionStorage.getItem('ninja_plan_price') || '99')
+            },
+            selectedSetupTier: setupTier ? { name: setupTier.name, price: setupTier.price } : null,
+            selectedAddOns: addOnsToProcess
+          }
+        });
+        setIsProcessing(false);
+      }
+    } catch (error) {
+      console.error('Complete error:', error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred.",
+        variant: "destructive"
+      });
+      setIsProcessing(false);
+    }
   };
 
   const progressPercent = ((currentStep + 1) / totalSteps) * 100;
@@ -280,8 +442,16 @@ const AddOns = () => {
                       variant={tier.recommended ? "ninja" : "outline"}
                       className="w-full text-[11px] sm:text-sm py-1.5 sm:py-2.5"
                       onClick={() => handleSetupSelect(index)}
+                      disabled={isProcessing}
                     >
-                      Select
+                      {isProcessing ? (
+                        <>
+                          <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        'Select'
+                      )}
                     </Button>
                   </div>
                 </Card>
@@ -378,8 +548,16 @@ const AddOns = () => {
                 size="lg"
                 className="w-full font-bold text-sm sm:text-lg"
                 onClick={() => handleAddOnSelect(currentAddOn.id)}
+                disabled={isProcessing}
               >
-                YES - Add {currentAddOn.name}
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                    Adding...
+                  </>
+                ) : (
+                  `YES - Add ${currentAddOn.name}`
+                )}
               </Button>
 
               <Button
@@ -387,6 +565,7 @@ const AddOns = () => {
                 size="sm"
                 className="w-full text-xs sm:text-base"
                 onClick={handleSkip}
+                disabled={isProcessing}
               >
                 No Thanks
               </Button>
