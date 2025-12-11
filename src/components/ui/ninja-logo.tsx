@@ -13,13 +13,10 @@ export const NinjaLogo: React.FC<NinjaLogoProps> = ({ size = 'md', className = '
   };
 
   return (
-    <div className={`${sizeClasses[size]} ${className}`}>
-      <div className="w-full h-full bg-gray-900 rounded-full flex items-center justify-center">
-        <div className="flex space-x-1">
-          <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
-          <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
-        </div>
-      </div>
-    </div>
+    <img 
+      src="/Ninja.png" 
+      alt="Ninja Logo" 
+      className={`${sizeClasses[size]} ${className} object-contain`}
+    />
   );
 };
