@@ -2,8 +2,10 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { NinjaLogo } from "@/components/ui/ninja-logo";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { CheckIcon, ZapIcon, FlameIcon, CrownIcon, SparklesIcon, MessageSquareIcon, StarIcon, BrainIcon, ShieldCheckIcon, ClockIcon, TrendingUpIcon, GiftIcon } from "lucide-react";
+import { CheckIcon, ZapIcon, FlameIcon, CrownIcon, SparklesIcon, MessageSquareIcon, StarIcon, BrainIcon, ShieldCheckIcon, ClockIcon, TrendingUpIcon, GiftIcon, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { createStickyOrder, type StickyOrderData } from "@/lib/sticky";
+import { toast } from "@/hooks/use-toast";
 
 interface LocationState {
   selectedPlan?: {
@@ -55,6 +57,8 @@ const FULL_PACKAGE = {
   }]
 };
 const SUPER_BOOST_PRICE = 999;
+const SUPER_BOOST_PRODUCT_ID = "18"; // Product ID for AI Super Boost - Annual
+
 const SuperBoost = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -65,6 +69,33 @@ const SuperBoost = () => {
   });
 
   const [showJackpot, setShowJackpot] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [customerInfo, setCustomerInfo] = useState<{
+    customerId?: string;
+    orderId?: string;
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+  }>({});
+
+  // Load customer info from session storage
+  useEffect(() => {
+    const customerId = sessionStorage.getItem('ninja_customer_id');
+    const orderId = sessionStorage.getItem('ninja_order_id');
+    const email = sessionStorage.getItem('ninja_customer_email');
+    const firstName = sessionStorage.getItem('ninja_customer_firstName');
+    const lastName = sessionStorage.getItem('ninja_customer_lastName');
+
+    if (customerId && orderId) {
+      setCustomerInfo({
+        customerId,
+        orderId,
+        email: email || '',
+        firstName: firstName || '',
+        lastName: lastName || ''
+      });
+    }
+  }, []);
 
   // Jackpot celebration on page load
   useEffect(() => {
@@ -99,14 +130,85 @@ const SuperBoost = () => {
   const totalValue = FULL_PACKAGE.plan.annualValue + FULL_PACKAGE.setup.price + FULL_PACKAGE.addOns.reduce((sum, a) => sum + a.annualValue, 0);
   const savings = totalValue - SUPER_BOOST_PRICE;
   const discountPercent = Math.round(savings / totalValue * 100);
-  const handleUpgrade = () => {
-    navigate("/thank-you?upgraded=true", {
-      state: {
-        ...state,
-        superBoostUpgraded: true
+  
+  const handleUpgrade = async () => {
+    setIsProcessing(true);
+
+    try {
+      // Validate customer info
+      if (!customerInfo.customerId || !customerInfo.orderId) {
+        toast({
+          title: "Error",
+          description: "Customer information not found. Please try again.",
+          variant: "destructive"
+        });
+        setIsProcessing(false);
+        return;
       }
-    });
+
+      // Create order for Super Boost product
+      const orderData: StickyOrderData = {
+        products: [{
+          id: SUPER_BOOST_PRODUCT_ID,
+          price: SUPER_BOOST_PRICE,
+          name: "AI Super Boost - Annual"
+        }],
+        email: customerInfo.email || '',
+        firstName: customerInfo.firstName || '',
+        lastName: customerInfo.lastName || '',
+        phone: '',
+        billingAddress: '',
+        billingCity: '',
+        billingState: '',
+        billingZip: '',
+        billingCountry: 'US',
+        cardNumber: '',
+        cardExpMonth: '',
+        cardExpYear: '',
+        cardCvv: '',
+        totalAmount: SUPER_BOOST_PRICE,
+        customerId: customerInfo.customerId,
+        parentOrderId: customerInfo.orderId,
+        stepNumber: 3 // Super Boost is step 3
+      };
+
+      const result = await createStickyOrder(orderData);
+
+      if (result.success) {
+        toast({
+          title: "🎉 Super Boost Activated!",
+          description: `Your AI Super Boost Bundle is now active. You saved $${savings}!`
+        });
+
+        // Navigate to thank you page with upgrade flag
+        setTimeout(() => {
+          navigate("/thank-you?upgraded=true", {
+            state: {
+              ...state,
+              superBoostUpgraded: true
+            }
+          });
+          setIsProcessing(false);
+        }, 1500);
+      } else {
+        toast({
+          title: "Order Failed",
+          description: result.error || "There was an error processing your upgrade.",
+          variant: "destructive"
+        });
+        setIsProcessing(false);
+      }
+    } catch (error) {
+      console.error('Super Boost upgrade error:', error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred.",
+        variant: "destructive"
+      });
+      setIsProcessing(false);
+    }
   };
+  
   const handleSkip = () => {
     navigate("/thank-you", { state });
   };
@@ -391,11 +493,30 @@ const SuperBoost = () => {
         <div className="space-y-3 max-w-2xl mx-auto animate-fade-in" style={{
         animationDelay: '0.3s'
       }}>
-          <Button variant="ninja" size="xl" className="w-full font-bold text-base sm:text-xl animate-pulse" onClick={handleUpgrade}>
-            🚀 YES! Upgrade to Super Boost - ${SUPER_BOOST_PRICE}
+          <Button 
+            variant="ninja" 
+            size="xl" 
+            className="w-full font-bold text-base sm:text-xl animate-pulse" 
+            onClick={handleUpgrade}
+            disabled={isProcessing}
+          >
+            {isProcessing ? (
+              <>
+                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              `🚀 YES! Upgrade to Super Boost - $${SUPER_BOOST_PRICE}`
+            )}
           </Button>
 
-          <Button variant="outline" size="sm" className="w-full text-xs sm:text-sm text-ninja-blue border-ninja-blue/30 hover:bg-ninja-blue/10 hover:border-ninja-blue/50" onClick={handleSkip}>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="w-full text-xs sm:text-sm text-ninja-blue border-ninja-blue/30 hover:bg-ninja-blue/10 hover:border-ninja-blue/50" 
+            onClick={handleSkip}
+            disabled={isProcessing}
+          >
             No thanks, continue with monthly plan
           </Button>
         </div>

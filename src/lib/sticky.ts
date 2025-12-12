@@ -58,7 +58,11 @@ export interface StickyOrderResponse {
   isSimulated?: boolean;
 }
 
-const STICKY_API_URL = import.meta.env.VITE_STICKY_API_URL || 'https://boostninja.sticky.io/api/v1';
+// Use proxy in development to avoid CORS issues
+const isDevelopment = import.meta.env.DEV;
+const STICKY_API_URL = isDevelopment 
+  ? '/api/sticky' 
+  : (import.meta.env.VITE_STICKY_API_URL || 'https://boostninja.sticky.io/api/v1');
 const API_USERNAME = import.meta.env.VITE_STICKY_API_USERNAME;
 const API_PASSWORD = import.meta.env.VITE_STICKY_API_PASSWORD;
 
@@ -164,6 +168,9 @@ export async function createStickyOrder(orderData: StickyOrderData): Promise<Sti
 
       if (productId === '4' || productId === '14' || productId === '15' || productId === '16') {
         // Setup fees - One time
+        billingModelId = '2';
+      } else if (productId === '18') {
+        // AI Super Boost - Annual (One time payment for annual subscription)
         billingModelId = '2';
       } else if (productId === '9' || productId === '6') {
         // Main subscriptions - Recurring

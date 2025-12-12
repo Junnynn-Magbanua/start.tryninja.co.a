@@ -163,7 +163,7 @@ const ThankYou = () => {
             Fast-track your boost with our online account activation form.
           </p>
           <Button size="lg" variant="ninja" className="w-full sm:w-auto text-base sm:text-lg font-bold px-8" asChild>
-            <a href="https://forms.google.com" target="_blank" rel="noopener noreferrer">
+            <a href="https://docs.google.com/forms/d/e/1FAIpQLSejM2BASVcGwwoDEk4bhnDsEbuwciXlqzYQPInuAmhjeKfUuQ/viewform" target="_blank" rel="noopener noreferrer">
               🚀 Start Onboarding Now
             </a>
           </Button>
@@ -253,7 +253,7 @@ const ThankYou = () => {
             Fast-track your boost with our online account activation form.
           </p>
           <Button size="lg" variant="ninja" className="w-full sm:w-auto text-base sm:text-lg font-bold px-8" asChild>
-            <a href="https://forms.google.com" target="_blank" rel="noopener noreferrer">
+            <a href="https://docs.google.com/forms/d/e/1FAIpQLSejM2BASVcGwwoDEk4bhnDsEbuwciXlqzYQPInuAmhjeKfUuQ/viewform" target="_blank" rel="noopener noreferrer">
               🚀 Start Onboarding Now
             </a>
           </Button>
